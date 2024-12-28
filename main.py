@@ -1,9 +1,10 @@
 import os
 import uuid
 import logging
+import time
 import torch
 import streamlit as st
-from transformers import AutoTokenizer, AutoModel
+from transformers import AutoModel
 from langchain_community.document_loaders import Docx2txtLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from chromadb import PersistentClient
@@ -14,55 +15,53 @@ logging.basicConfig(
 )
 
 
-# Initialize Hugging Face model and tokenizer
+# Initialize Hugging Face model
 def initialize_huggingface_model():
-    """Load the pre-trained Hugging Face model and tokenizer."""
-    logging.info("Initializing Hugging Face model and tokenizer.")
-    tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
-    model = AutoModel.from_pretrained("bert-base-uncased")
-    return tokenizer, model
+    """Load the pre-trained Hugging Face model."""
+    logging.info("Initializing Hugging Face model.")
+    start_time = time.time()
+    model = AutoModel.from_pretrained(
+        "jinaai/jina-embeddings-v2-base-en", trust_remote_code=True
+    )
+    elapsed_time = time.time() - start_time
+    logging.info("Model initialized in %.2f seconds.", elapsed_time)
+    return model, elapsed_time
 
 
-def get_embedding(text, tokenizer, model):
+def get_embedding(text, model):
     """Generate an embedding for the given text using a pretrained model.
 
     Args:
         text (str): Input text to embed.
-        tokenizer: Hugging Face tokenizer.
         model: Hugging Face model.
 
     Returns:
         numpy.ndarray: Embedding vector for the input text.
     """
     logging.info("Generating embedding for the provided text.")
-    embedding_model = AutoModel.from_pretrained(
-        "jinaai/jina-embeddings-v2-base-en", trust_remote_code=True
-    )
-    user_query = text
-    query_embeddings = embedding_model.encode(user_query).tolist()
-    return query_embeddings
 
-    # inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
-    # with torch.no_grad():
-    #     outputs = model(**inputs)
-    # return outputs.last_hidden_state.mean(dim=1).numpy()
+    user_query = text
+    query_embeddings = model.encode(user_query).tolist()
+    return query_embeddings
 
 
 # Initialize ChromaDB client and collection
 def initialize_chromadb():
     """Initialize ChromaDB client and create a collection for resumes."""
     logging.info("Initializing ChromaDB client and collection.")
+    start_time = time.time()
     client = PersistentClient("vectorstore")
     collection = client.get_or_create_collection("resumes")
-    return collection
+    elapsed_time = time.time() - start_time
+    logging.info("ChromaDB initialized in %.2f seconds.", elapsed_time)
+    return collection, elapsed_time
 
 
-def process_resumes(resume_folder, tokenizer, model, collection):
+def process_resumes(resume_folder, model, collection):
     """Process resumes by loading, extracting text, generating embeddings, and storing in ChromaDB.
 
     Args:
         resume_folder (str): Path to the folder containing resume files.
-        tokenizer: Hugging Face tokenizer.
         model: Hugging Face model.
         collection: ChromaDB collection object.
     """
@@ -79,6 +78,7 @@ def process_resumes(resume_folder, tokenizer, model, collection):
         logging.warning("No .docx files found in the resources folder.")
         return
 
+    total_start_time = time.time()
     with st.spinner("Processing resumes..."):
         for file_name in resume_files:
             logging.info("Processing file: %s", file_name)
@@ -99,7 +99,7 @@ def process_resumes(resume_folder, tokenizer, model, collection):
 
                 for chunk in chunks:
                     # Generate embedding for each chunk
-                    embedding = get_embedding(chunk, tokenizer, model)
+                    embedding = get_embedding(chunk, model)
                     metadata = {"filename": file_name}
 
                     collection.add(
@@ -109,17 +109,20 @@ def process_resumes(resume_folder, tokenizer, model, collection):
                         ids=[str(uuid.uuid4())],
                     )
 
-    st.success(f"Processed {len(resume_files)} resumes successfully!")
-    logging.info("Finished processing resumes.")
+    total_elapsed_time = time.time() - total_start_time
+    st.success(
+        f"Processed {len(resume_files)} resumes successfully in {total_elapsed_time:.2f} seconds!"
+    )
+    logging.info("Finished processing resumes in %.2f seconds.", total_elapsed_time)
+    return total_elapsed_time
 
 
-def analyze_requirements(project_requirements, collection, tokenizer, model):
+def analyze_requirements(project_requirements, collection, model):
     """Analyze project requirements and recommend candidates based on similarity.
 
     Args:
         project_requirements (str): Text describing project requirements.
         collection: ChromaDB collection object.
-        tokenizer: Hugging Face tokenizer.
         model: Hugging Face model.
     """
     if not project_requirements:
@@ -128,17 +131,21 @@ def analyze_requirements(project_requirements, collection, tokenizer, model):
         return
 
     logging.info("Analyzing project requirements.")
-    req_embedding = get_embedding(project_requirements, tokenizer, model)
+    start_time = time.time()
+    req_embedding = get_embedding(project_requirements, model)
 
     with st.spinner("Analyzing requirements and fetching results..."):
         results = collection.query(
             query_embeddings=req_embedding, n_results=5
         )  # Adjust n_results as needed
 
+    elapsed_time = time.time() - start_time
     st.write("Recommended Candidates:")
     for candidate in results.get("documents", []):
         st.write(candidate)
-    logging.info("Analysis completed and results displayed.")
+    st.success(f"Analysis completed in {elapsed_time:.2f} seconds!")
+    logging.info("Analysis completed in %.2f seconds.", elapsed_time)
+    return elapsed_time
 
 
 # Main Streamlit UI and application logic
@@ -154,21 +161,28 @@ def main():
     )
 
     # Initialize models and collections
-    tokenizer, model = initialize_huggingface_model()
-    collection = initialize_chromadb()
+    model, model_time = initialize_huggingface_model()
+    collection, chromadb_time = initialize_chromadb()
 
     # Specify the folder containing resumes
     resume_folder = "resource"
 
     # Process resumes
-    process_resumes(resume_folder, tokenizer, model, collection)
+    resume_processing_time = process_resumes(resume_folder, model, collection)
 
     # Input project requirements
     project_requirements = st.text_area("Enter Project Requirements")
 
     if st.button("Analyze"):
         st.progress(0)
-        analyze_requirements(project_requirements, collection, tokenizer, model)
+        analysis_time = analyze_requirements(project_requirements, collection, model)
+
+        # Display timing information
+        st.markdown("### Timing Summary")
+        st.write(f"Model Initialization: {model_time:.2f} seconds")
+        st.write(f"ChromaDB Initialization: {chromadb_time:.2f} seconds")
+        st.write(f"Resume Processing: {resume_processing_time:.2f} seconds")
+        st.write(f"Analysis Time: {analysis_time:.2f} seconds")
 
 
 if __name__ == "__main__":
