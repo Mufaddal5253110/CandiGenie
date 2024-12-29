@@ -5,10 +5,11 @@ import streamlit as st
 from resume_processor import ResumeProcessor
 import os
 from dotenv import load_dotenv
+import pandas as pd
 
 load_dotenv()
 
-vector_results_count = 3
+vector_results_count = 6
 
 # Configure logging
 logging.basicConfig(
@@ -26,24 +27,26 @@ def analyze_requirements(query, resume_processor, query_processor):
         query_processor (QueryProcessor): Instance for interacting with the LLM.
 
     Returns:
-        float: Total elapsed time for the entire analysis process.
+        dict: Timing details for the analysis process.
     """
     if not query:
         st.warning("Please enter project requirements before analyzing.")
         logging.warning("No project requirements entered.")
-        return 0
+        return {}
 
     logging.info("Starting analysis for query: %s", query)
 
     # Measure time for vector search
     start_time = time.time()
     req_embedding = resume_processor.get_embedding(query)
+
     with st.spinner("Fetching relevant documents from the vector database..."):
         vector_start_time = time.time()
         results = resume_processor.collection.query(
             query_embeddings=req_embedding, n_results=vector_results_count
         )
         vector_elapsed_time = time.time() - vector_start_time
+
     logging.info("Vector search completed in %.2f seconds.", vector_elapsed_time)
 
     # Initialize processed chunks and timing
@@ -61,6 +64,7 @@ def analyze_requirements(query, resume_processor, query_processor):
         llm_elapsed_time = time.time() - llm_start_time
         llm_elapsed_times.append(llm_elapsed_time)
         processed_chunks.append(processed_response)
+
         logging.info("Processed document with LLM in %.2f seconds.", llm_elapsed_time)
 
     # Final LLM call
@@ -68,6 +72,7 @@ def analyze_requirements(query, resume_processor, query_processor):
     final_llm_start_time = time.time()
     final_response = query_processor.generate_response(query, final_context)
     final_llm_elapsed_time = time.time() - final_llm_start_time
+
     logging.info("Final LLM call completed in %.2f seconds.", final_llm_elapsed_time)
 
     # Total elapsed time
@@ -76,21 +81,20 @@ def analyze_requirements(query, resume_processor, query_processor):
 
     # Display results
     st.success(f"Analysis completed in {total_elapsed_time:.2f} seconds!")
-    st.markdown("### Timing Summary")
-    st.write(f"Vector Search Time: {vector_elapsed_time:.2f} seconds")
-    for i, llm_time in enumerate(llm_elapsed_times, start=1):
-        st.write(f"LLM Call {i} Time: {llm_time:.2f} seconds")
-    st.write(f"Final LLM Call Time: {final_llm_elapsed_time:.2f} seconds")
 
-    st.markdown("### Answer:")
-    st.write(final_response)
-
-    return total_elapsed_time
+    return {
+        "vector_search": vector_elapsed_time,
+        "llm_calls": llm_elapsed_times,
+        "final_llm_call": final_llm_elapsed_time,
+        "final_response": final_response,
+        "total_analysis": total_elapsed_time,
+    }
 
 
 def main():
     """Main function to run the Streamlit application."""
     st.title("CandiGenie")
+
     st.markdown(
         """
         ### Welcome to CandiGenie
@@ -114,12 +118,40 @@ def main():
     query = st.text_area("Enter Project Requirements")
 
     if st.button("Analyze"):
-        analysis_time = analyze_requirements(query, resume_processor, query_processor)
+        analysis_results = analyze_requirements(
+            query, resume_processor, query_processor
+        )
 
-        # Display timing information
-        st.markdown("### Timing Summary")
-        st.write(f"Resume Processing Time: {processing_time:.2f} seconds")
-        st.write(f"Analysis Time: {analysis_time:.2f} seconds")
+        # Display question and answer together
+        st.markdown("### Answer:")
+        st.write(analysis_results["final_response"])
+
+        # Display timing information in tabular form
+        timing_data = {
+            "Step": [
+                "Resume Processing Time",
+                "Vector Search Time",
+                "Total LLM Calls",
+                "LLM Calls Time",
+                "Final LLM Call Time",
+                "Total Analysis Time",
+                "Total Time",
+            ],
+            "Data": [
+                processing_time,
+                f'{analysis_results["vector_search"]} seconds',
+                f"{vector_results_count + 1} count",
+                f'{sum(analysis_results["llm_calls"])} seconds',
+                f'{analysis_results["final_llm_call"]} seconds',
+                f'{analysis_results["total_analysis"]} seconds',
+                f'{sum([processing_time, analysis_results["vector_search"], sum(analysis_results["llm_calls"]), analysis_results["final_llm_call"], analysis_results["total_analysis"]])} seconds',
+            ],
+        }
+
+        timing_df = pd.DataFrame(timing_data)
+
+        st.markdown("### Summary")
+        st.table(timing_df)
 
 
 if __name__ == "__main__":
