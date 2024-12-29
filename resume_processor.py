@@ -5,6 +5,7 @@ import time
 import pandas as pd
 from langchain_community.document_loaders import Docx2txtLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_huggingface import HuggingFaceEmbeddings
 from chromadb import PersistentClient
 from transformers import AutoModel
 
@@ -19,24 +20,23 @@ class ResumeProcessor:
         self.resume_folder = resume_folder
         self.chroma_client = PersistentClient("vectorstore")
         self.collection = self.chroma_client.get_or_create_collection(collection_name)
-        self.model = self._initialize_huggingface_model()
+        self.embedding_model = self._initialize_huggingface_model()
 
     def _initialize_huggingface_model(self):
         """Load the pre-trained Hugging Face model."""
         logging.info("Initializing Hugging Face model.")
         start_time = time.time()
-        model = AutoModel.from_pretrained(
-            "jinaai/jina-embeddings-v2-base-en", trust_remote_code=True
+        model = HuggingFaceEmbeddings(
+            model_name="sentence-transformers/all-mpnet-base-v2"
         )
         elapsed_time = time.time() - start_time
         logging.info("Model initialized in %.2f seconds.", elapsed_time)
         return model
 
     def get_embedding(self, text):
-        """Generate an embedding for the given text using the pretrained model."""
+        """Generate an embedding for the given text using the HuggingFaceEmbeddings model."""
         logging.info("Generating embedding for the provided text.")
-        query_embeddings = self.model.encode(text).tolist()
-        return query_embeddings
+        return self.embedding_model.embed_query(text)
 
     def load_and_process_resumes(self):
         """Load resumes, generate embeddings, and store them in ChromaDB."""
@@ -60,7 +60,7 @@ class ResumeProcessor:
             documents = loader.load()
 
             text_splitter = RecursiveCharacterTextSplitter(
-                chunk_size=500, chunk_overlap=20
+                chunk_size=1000, chunk_overlap=20
             )
 
             for doc in documents:
