@@ -58,24 +58,18 @@ class ResumeProcessor:
             loader = Docx2txtLoader(file_path)
             documents = loader.load()
 
-            text_splitter = RecursiveCharacterTextSplitter(
-                chunk_size=1000, chunk_overlap=20
-            )
-
             for doc in documents:
                 resume_text = doc.page_content
-                chunks = text_splitter.split_text(resume_text)
 
-                for chunk in chunks:
-                    embedding = self.get_embedding(chunk)
-                    metadata = {"filename": file_name}
+                embedding = self.get_embedding(resume_text)
+                metadata = {"filename": file_name}
 
-                    self.collection.add(
-                        documents=[chunk],
-                        embeddings=[embedding],
-                        metadatas=[metadata],
-                        ids=[str(uuid.uuid4())],
-                    )
+                self.collection.add(
+                    documents=[resume_text],
+                    embeddings=[embedding],
+                    metadatas=[metadata],
+                    ids=[str(uuid.uuid4())],
+                )
 
         total_elapsed_time = time.time() - total_start_time
         logging.info("Finished processing resumes in %.2f seconds.", total_elapsed_time)

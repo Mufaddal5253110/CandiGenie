@@ -105,7 +105,7 @@ def main():
 
     # Initialize resume processor and query processor
     resume_processor = ResumeProcessor(resume_folder="resource")
-    query_processor = QueryProcessor(groq_api_key=os.getenv("GROQ_API_KEY"))
+    query_processor = QueryProcessor()
 
     # Load and process resumes if collection is empty
     if not resume_processor.collection.count():

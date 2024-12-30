@@ -10,3 +10,4 @@ transformers==4.47.1
 torch==2.5.1
 python-dotenv==1.0.1
 pandas==2.2.2
+langchain-ollama==0.2.2
