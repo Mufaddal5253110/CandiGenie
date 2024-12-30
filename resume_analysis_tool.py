@@ -60,7 +60,9 @@ def analyze_requirements(query, resume_processor, query_processor):
     for doc, meta in zip(documents, metadatas):
         context = f"Filename: {meta.get('filename', 'N/A')}\n\n{doc}"
         llm_start_time = time.time()
-        processed_response = query_processor.generate_response(query, context)
+        processed_response = query_processor.generate_individual_response(
+            query, context
+        )
         llm_elapsed_time = time.time() - llm_start_time
         llm_elapsed_times.append(llm_elapsed_time)
         processed_chunks.append(processed_response)
@@ -70,7 +72,7 @@ def analyze_requirements(query, resume_processor, query_processor):
     # Final LLM call
     final_context = "\n".join(processed_chunks)
     final_llm_start_time = time.time()
-    final_response = query_processor.generate_response(query, final_context)
+    final_response = query_processor.generate_final_response(query, final_context)
     final_llm_elapsed_time = time.time() - final_llm_start_time
 
     logging.info("Final LLM call completed in %.2f seconds.", final_llm_elapsed_time)
