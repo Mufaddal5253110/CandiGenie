@@ -9,7 +9,7 @@ import pandas as pd
 
 load_dotenv()
 
-vector_results_count = 10
+vector_results_count = 5
 
 # Configure logging
 logging.basicConfig(
