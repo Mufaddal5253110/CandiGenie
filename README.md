@@ -35,6 +35,8 @@ Organizations often face challenges in quickly and accurately identifying candid
 
 ## Architecture Flow
 
+![Architecture Diagram](screenshots/candigenie_architecture.png)
+
 1. **Resume Upload**: Users upload resumes to the `resource` folder in docx format.
 2. **Resume Processing**:
    - Extract text from resumes (.docx files).
