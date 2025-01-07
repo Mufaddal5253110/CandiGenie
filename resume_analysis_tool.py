@@ -105,7 +105,7 @@ def main():
 
     # Initialize resume processor and query processor
     resume_processor = ResumeProcessor(resume_folder="resource")
-    query_processor = QueryProcessor(model_name="llama3.1:70b")
+    query_processor = QueryProcessor(model_name="llama3.2:latest")
 
     # Load and process resumes if collection is empty
     if not resume_processor.collection.count():
