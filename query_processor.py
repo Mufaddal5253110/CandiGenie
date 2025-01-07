@@ -3,7 +3,7 @@ from langchain_core.prompts import PromptTemplate
 
 
 class QueryProcessor:
-    def __init__(self, groq_api_key, model_name="llama-3.3-70b-versatile"):
+    def __init__(self, groq_api_key, model_name="llama-3.1-70b-versatile"):
         self.llm = ChatGroq(
             temperature=0, groq_api_key=groq_api_key, model_name=model_name
         )
