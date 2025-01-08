@@ -100,7 +100,6 @@ def main():
     st.markdown(
         """
         ### Welcome to CandiGenie
-        - Upload resumes in the 'resource' folder.
         - Enter project requirements to analyze and get candidate recommendations.
         """
     )
